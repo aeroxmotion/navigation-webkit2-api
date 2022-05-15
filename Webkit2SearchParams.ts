@@ -3,8 +3,6 @@ type ValueTransformer<T> = (value: string) => T;
 
 const identityFn: ValueTransformer<any> = value => value;
 
-const a = new URLSearchParams()
-
 /**
  * Helper class
  */
