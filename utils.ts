@@ -34,7 +34,7 @@ export function getTargetURL(deeplink: string, rewriteHostDev = true): URL {
 
   if (sniffedURL && __inDev && rewriteHostDev) {
     // Rewrite host pointing to self location
-    targetURL.host = this._location.host;
+    targetURL.host = window.location.host;
   }
 
   if (!targetURL.protocol.startsWith('http')) {
