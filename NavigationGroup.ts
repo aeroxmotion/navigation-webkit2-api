@@ -31,18 +31,18 @@ export class NavigationGroup {
         }
       };
 
-      const onUnload = () => {
+      const onPageHide = () => {
         reject(new Error('[openForResult] tab closed'));
         clearListeners();
       };
 
       const clearListeners = () => {
         targetWindow.removeEventListener('message', onMessage);
-        targetWindow.removeEventListener('unload', onUnload);
+        targetWindow.removeEventListener('pagehide', onPageHide);
       };
 
       targetWindow.addEventListener('message', onMessage);
-      targetWindow.addEventListener('unload', onUnload);
+      targetWindow.addEventListener('pagehide', onPageHide);
     });
   }
 
@@ -51,13 +51,21 @@ export class NavigationGroup {
    */
   private _window = window;
   private _storage: Storage = this._window.sessionStorage;
+  private _groupStoragePrefix = NavigationGroup.STORAGE_KEY_PREFIX;
 
   constructor(
-    public group: string) {}
+    public group: string) {
+    this._groupStoragePrefix += `:${group}`;
+  }
 
   close(result: any = null): Promise<string> {
     this._window.postMessage({
       [NavigationGroup.resultKey(this.group)]: result,
+    });
+
+    // Clear store on unload
+    this._window.addEventListener('pagehide', () => {
+      this._clearStore();
     });
 
     return new Promise((resolve) => {
@@ -78,7 +86,26 @@ export class NavigationGroup {
     return '';
   }
 
+  private _clearStore() {
+    const keysToRemove: string[] = [];
+    const { length } = this._storage;
+
+    // 1. Collect keys to remove
+    for (let i = 0; i < length; i++) {
+      const key = this._storage.key(i);
+
+      if (key.startsWith(this._groupStoragePrefix)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    // 2. Remove keys
+    for (const key of keysToRemove) {
+      this._storage.removeItem(key);
+    }
+  }
+
   private _storageKey(selector = 'default') {
-    return `${NavigationGroup.STORAGE_KEY_PREFIX}:${this.group}:${selector}`;
+    return `${this._groupStoragePrefix}:${selector}`;
   }
 }
