@@ -1,71 +1,19 @@
+import { Webkit2SearchParams } from './Webkit2SearchParams'
+import { NavigationState } from './NavigationState'
+import { generateRandomGroupID, debugPossibleUnhandledURL } from './utils'
+
 interface PushOptions {
   replace?: boolean;
   screens_group?: string;
 }
 
-type Param = 'group' | 'screens';
-type ValueTransformer<T> = (value: string) => T;
-
-const identityFn: ValueTransformer<any> = value => value;
-
-const NativeSearchParams = typeof URLSearchParams !== 'undefined'
-  ? URLSearchParams
-  // Fallback to `Map` class when no `URLSearchParams`
-  // is available - like in Node.js
-  : Map;
-
-/**
- * Helper class
- */
-class Webkit2SearchParams extends NativeSearchParams {
-  static PARAM_PREFIX = '__webkit2__';
-
-  get<T = string>(
-    param: Param,
-    defaultValue?: string,
-    transformer: ValueTransformer<T> = identityFn,
-  ): T {
-    return transformer(super.get(Webkit2SearchParams.PARAM_PREFIX + param) || defaultValue);
-  }
-
-  set(param: Param, value: any) {
-    super.set(param, String(value));
-  }
+interface PushWebOptions {
+  __web?: {
+    rewriteHostDev?: boolean;
+  };
 }
 
-class NavigationState {
-  /**
-   * Current screens group. Defaults to `main`
-   */
-  group: string;
-
-  /**
-   * Total number of opened screens. Defaults to `1` -- starting screen
-   */
-  screens: number;
-
-  constructor(init: Partial<NavigationState>) {
-    Object.assign(this, init);
-  }
-
-  /**
-   * Transition to next navigation state by producing a new state
-   */
-  transitionTo(nextStateInit: Partial<NavigationState & { replace: boolean }>): NavigationState {
-    const nextGroup = nextStateInit.group ?? this.group;
-    const nextScreens = nextGroup === this.group
-      ? this.screens + Number(!nextStateInit.replace)
-      // Reset screens count while transitioning between screens groups
-      : 1;
-
-    return new NavigationState({
-      group: nextGroup,
-      screens: nextScreens,
-    });
-  }
-}
-
-class Navigation {
+export class Navigation {
   /**
    * Helpers
    */
@@ -94,14 +42,12 @@ class Navigation {
     return '';
   }
 
-  async push(deeplink: string, options: PushOptions = {}): Promise<string> {
+  async push(deeplink: string, options: PushOptions & PushWebOptions = {}): Promise<string> {
     const parsedDeeplink = new URL(deeplink);
     const sniffedURL = parsedDeeplink.searchParams.get('url');
     const targetURL = sniffedURL ? new URL(sniffedURL) : parsedDeeplink;
 
-    if (!sniffedURL) {
-      debugPossibleUnhandledURL(targetURL);
-    } else {
+    if (sniffedURL) {
       const nextParams = new Webkit2SearchParams(targetURL.searchParams);
       const nextState = this._state.transitionTo({
         group: options.screens_group,
@@ -114,10 +60,14 @@ class Navigation {
       // Update with new params
       targetURL.search = nextParams.toString();
 
-      if (this.__inDev) {
+      if (this.__inDev && options.__web?.rewriteHostDev !== false) {
         // Rewrite host pointing to self location
         targetURL.host = this._location.host;
       }
+    }
+
+    if (!targetURL.protocol.startsWith('http')) {
+      debugPossibleUnhandledURL(deeplink, targetURL);
     }
 
     // Try to perform navigation
@@ -133,7 +83,16 @@ class Navigation {
   }
 
   async openForResult(deeplink: string): Promise<any> {
-    await this.push(deeplink);
+    // Generate a random `GROUP_ID` to reset opened `screens`
+    const randomGroup = generateRandomGroupID();
+
+    await this.push(deeplink, {
+      screens_group: randomGroup,
+      __web: {
+        rewriteHostDev: false,
+      },
+    });
+
     return null;
   }
 
@@ -141,20 +100,4 @@ class Navigation {
     await this.pop({ screens: this._state.screens });
     return '';
   }
-}
-
-function debugPossibleUnhandledURL(url: URL) {
-  const params = [...url.searchParams.entries()];
-
-  console.warn(`Possible unhandled URL: ${url.origin + url.pathname}
-
-  --- Query Params ---
-  ${params.length
-    ? params
-        .map(([key, value]) => `${key}: ${value}`)
-        .join(`\n  `)
-    : 'No query params found...'}
-
-  --- Full URL ---
-  ${url.toString()}`);
 }
