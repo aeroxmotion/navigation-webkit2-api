@@ -1,7 +1,9 @@
 import { generateRandomGroupID, getTargetURL } from './utils';
 import { Webkit2SearchParams } from './Webkit2SearchParams';
 
+
 export class NavigationGroup {
+  static NON_CACHED_STORE = {};
   static RESULT_KEY_PREFIX = '__webkit2__result__';
   static STORAGE_KEY_PREFIX = '__webkit2__storage__';
 
@@ -51,11 +53,16 @@ export class NavigationGroup {
    */
   private _window = window;
   private _storage: Storage = this._window.sessionStorage;
-  private _groupStoragePrefix = NavigationGroup.STORAGE_KEY_PREFIX;
+
+  /**
+   * Storage
+   */
+  private _storageKey = NavigationGroup.STORAGE_KEY_PREFIX;
+  private _cachedStore: any = NavigationGroup.NON_CACHED_STORE;
 
   constructor(
     public group: string) {
-    this._groupStoragePrefix += `:${group}`;
+    this._storageKey += `:${group}`;
   }
 
   close(result: any = null): Promise<string> {
@@ -76,36 +83,23 @@ export class NavigationGroup {
     });
   }
 
-  async getStore(selector?: string): Promise<any> {
-    const store = JSON.parse(this._storage.getItem(this._storageKey(selector)) ?? '{}');
-    return store;
+  async getStore(): Promise<any> {
+    if (this._cachedStore === NavigationGroup.NON_CACHED_STORE) {
+      this._cachedStore = JSON.parse(this._storage.getItem(this._storageKey));
+    }
+
+    return this._cachedStore;
   }
 
-  async setStore(value: any, selector?: string): Promise<string> {
-    this._storage.setItem(this._storageKey(selector), JSON.stringify(value));
+  async setStore(nextStore: any): Promise<string> {
+    this._storage.setItem(this._storageKey, JSON.stringify(nextStore));
+    this._cachedStore = NavigationGroup.NON_CACHED_STORE;
+
     return '';
   }
 
   private _clearStore(): void {
-    const keysToRemove: string[] = [];
-    const { length } = this._storage;
-
-    // 1. Collect keys to remove
-    for (let i = 0; i < length; i++) {
-      const key = this._storage.key(i);
-
-      if (key.startsWith(this._groupStoragePrefix)) {
-        keysToRemove.push(key);
-      }
-    }
-
-    // 2. Remove keys
-    for (const key of keysToRemove) {
-      this._storage.removeItem(key);
-    }
-  }
-
-  private _storageKey(selector = 'default') {
-    return `${this._groupStoragePrefix}:${selector}`;
+    this._storage.removeItem(this._storageKey);
+    this._cachedStore = NavigationGroup.NON_CACHED_STORE;
   }
 }

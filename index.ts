@@ -79,11 +79,18 @@ export class Navigation {
   }
 
   getStoreGroup(selector?: string): Promise<any> {
-    return this._group.getStore(selector);
+    const store = this._group.getStore();
+    return selector ? store[selector] : store;
   }
 
-  setStoreGroup(nextStoreProducer?: (store: any) => any, selector?: string) {
-    const nextStore = nextStoreProducer(this._group.getStore(selector));
-    return this._group.setStore(nextStore, selector);
+  setStoreGroup(nextStoreProducer: (store: any) => any, selector?: string) {
+    const store = this._group.getStore();
+    const nextStore = nextStoreProducer(selector != null ? store[selector] : store);
+
+    return this._group.setStore(
+      selector != null
+        ? { ...store, [selector]: nextStore }
+        : nextStore,
+    );
   }
 }
