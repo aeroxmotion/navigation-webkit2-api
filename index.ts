@@ -74,6 +74,20 @@ export class Navigation {
     return resultPromise;
   }
 
+  // TODO(cacastelmeli): implement this
+  canOpenDeeplink() {
+    return true;
+  }
+
+  async openLinkInAppBrowser(url: string): Promise<string> {
+    window.open(url, '_blank');
+    return '';
+  }
+
+  opneLinkOutsideApp(url: string): Promise<string> {
+    return this.openLinkInAppBrowser(url);
+  }
+
   async closeScreenGroup(args: { result?: any } = {}): Promise<string> {
     return this._group.close(args.result);
   }
