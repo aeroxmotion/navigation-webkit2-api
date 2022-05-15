@@ -86,7 +86,7 @@ export class NavigationGroup {
     return '';
   }
 
-  private _clearStore() {
+  private _clearStore(): void {
     const keysToRemove: string[] = [];
     const { length } = this._storage;
 

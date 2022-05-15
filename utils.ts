@@ -1,4 +1,4 @@
-export function generateRandomGroupID() {
+export function generateRandomGroupID(): string {
   return [
     Date.now().toString(36),
     performance.now().toString(36),
@@ -6,7 +6,7 @@ export function generateRandomGroupID() {
   ].join('-');
 }
 
-export function debugPossibleUnhandledURL(deeplink: string, url: URL) {
+export function debugPossibleUnhandledURL(deeplink: string, url: URL): void {
   const params = [...url.searchParams.entries()];
 
   console.warn(`Possible unhandled URL: ${url.origin + url.pathname}
@@ -25,7 +25,7 @@ export function debugPossibleUnhandledURL(deeplink: string, url: URL) {
   ${deeplink}`);
 }
 
-export function getTargetURL(deeplink: string, rewriteHostDev = true) {
+export function getTargetURL(deeplink: string, rewriteHostDev = true): URL {
   const __inDev = window.location.hostname.startsWith('dev.');
 
   const parsedDeeplink = new URL(deeplink);
