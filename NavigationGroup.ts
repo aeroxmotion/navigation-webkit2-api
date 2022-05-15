@@ -1,7 +1,6 @@
 import { generateRandomGroupID, getTargetURL } from './utils';
 import { Webkit2SearchParams } from './Webkit2SearchParams';
 
-
 export class NavigationGroup {
   static NON_CACHED_STORE = {};
   static RESULT_KEY_PREFIX = '__webkit2__result__';
