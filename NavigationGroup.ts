@@ -6,7 +6,7 @@ export class NavigationGroup {
   static RESULT_KEY_PREFIX = '__webkit2__result__';
   static STORAGE_KEY_PREFIX = '__webkit2__storage__';
 
-  static resultKey(group: string) {
+  static resultKey(group: string): string {
     return NavigationGroup.RESULT_KEY_PREFIX + group;
   }
 

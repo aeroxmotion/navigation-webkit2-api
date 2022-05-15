@@ -9,7 +9,7 @@ const identityFn: ValueTransformer<any> = value => value;
 export class Webkit2SearchParams extends URLSearchParams {
   static PARAM_PREFIX = '__webkit2__';
 
-  static prefixParam(param: Param) {
+  static prefixParam(param: Param): string {
     return this.PARAM_PREFIX + param;
   }
 
