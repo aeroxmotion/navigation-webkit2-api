@@ -3,7 +3,7 @@ interface PushOptions {
   screens_group?: string;
 }
 
-type Param = 'screens_group' | 'opened_screens';
+type Param = 'group' | 'screens';
 type ValueTransformer<T> = (value: string) => T;
 
 const identityFn: ValueTransformer<any> = value => value;
@@ -11,25 +11,25 @@ const identityFn: ValueTransformer<any> = value => value;
 const NativeSearchParams = typeof URLSearchParams !== 'undefined'
   ? URLSearchParams
   // Fallback to `Map` class when no `URLSearchParams`
-  // is available, like in Node.js
+  // is available - like in Node.js
   : Map;
 
 /**
  * Helper class
  */
 class Webkit2SearchParams extends NativeSearchParams {
-  static PARAM_PREFIX = 'webkit2';
+  static PARAM_PREFIX = '__webkit2__';
 
   get<T = string>(
     param: Param,
     defaultValue?: string,
     transformer: ValueTransformer<T> = identityFn,
   ): T {
-    return transformer(super.get(`${Webkit2SearchParams.PARAM_PREFIX}_${param}`) || defaultValue);
+    return transformer(super.get(Webkit2SearchParams.PARAM_PREFIX + param) || defaultValue);
   }
 
   set(param: Param, value: any) {
-    return super.set(param, String(value));
+    super.set(param, String(value));
   }
 }
 
@@ -44,16 +44,6 @@ class NavigationState {
    */
   screens: number;
 
-  /**
-   *
-   */
-  static fromWebkit2Params(params: Webkit2SearchParams) {
-    return new NavigationState({
-      group: params.get('screens_group', 'main'),
-      screens: params.get('opened_screens', '1', Number),
-    });
-  }
-
   constructor(init: Partial<NavigationState>) {
     Object.assign(this, init);
   }
@@ -61,7 +51,7 @@ class NavigationState {
   /**
    * Transition to next navigation state by producing a new state
    */
-  transitionTo(nextStateInit: Partial<NavigationState> & { replace?: boolean }): NavigationState {
+  transitionTo(nextStateInit: Partial<NavigationState & { replace: boolean }>): NavigationState {
     const nextGroup = nextStateInit.group ?? this.group;
     const nextScreens = nextGroup === this.group
       ? this.screens + Number(!nextStateInit.replace)
@@ -75,7 +65,7 @@ class NavigationState {
   }
 }
 
-class Navigation extends Object {
+class Navigation {
   /**
    * Helpers
    */
@@ -83,16 +73,21 @@ class Navigation extends Object {
   private _location = window.location;
 
   /**
-   * Current navigation state
-   */
-  private _state = NavigationState.fromWebkit2Params(
-    new Webkit2SearchParams(this._location.search),
-  );
-
-  /**
    * Flag for DEV mode
    */
   private __inDev = this._location.hostname.startsWith('dev.');
+
+  /**
+   * Current navigation state
+   */
+  private _state: NavigationState = (() => {
+    const params = new Webkit2SearchParams(this._location.search);
+
+    return new NavigationState({
+      group: params.get('group', 'main'),
+      screens: params.get('screens', '1', Number),
+    });
+  })();
 
   async reload(): Promise<string> {
     this._location.reload();
@@ -104,25 +99,28 @@ class Navigation extends Object {
     const sniffedURL = parsedDeeplink.searchParams.get('url');
     const targetURL = sniffedURL ? new URL(sniffedURL) : parsedDeeplink;
 
-    if (sniffedURL) {
-      if (this.__inDev) {
-        // Rewrite host pointing to self location
-        targetURL.host = this._location.host;
-      }
-
+    if (!sniffedURL) {
+      debugPossibleUnhandledURL(targetURL);
+    } else {
       const nextParams = new Webkit2SearchParams(targetURL.searchParams);
       const nextState = this._state.transitionTo({
         group: options.screens_group,
         replace: options.replace,
       });
 
-      nextParams.set('screens_group', nextState.group);
-      nextParams.set('opened_screens', nextState.screens);
+      nextParams.set('group', nextState.group);
+      nextParams.set('screens', nextState.screens);
 
       // Update with new params
       targetURL.search = nextParams.toString();
+
+      if (this.__inDev) {
+        // Rewrite host pointing to self location
+        targetURL.host = this._location.host;
+      }
     }
 
+    // Try to perform navigation
     this._location[options.replace ? 'replace' : 'assign'](targetURL);
     return targetURL.toString();
   }
@@ -143,4 +141,20 @@ class Navigation extends Object {
     await this.pop({ screens: this._state.screens });
     return '';
   }
+}
+
+function debugPossibleUnhandledURL(url: URL) {
+  const params = [...url.searchParams.entries()];
+
+  console.warn(`Possible unhandled URL: ${url.origin + url.pathname}
+
+  --- Query Params ---
+  ${params.length
+    ? params
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(`\n  `)
+    : 'No query params found...'}
+
+  --- Full URL ---
+  ${url.toString()}`);
 }
