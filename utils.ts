@@ -24,3 +24,22 @@ export function debugPossibleUnhandledURL(deeplink: string, url: URL) {
   --- Unparsed URL ---
   ${deeplink}`);
 }
+
+export function getTargetURL(deeplink: string, rewriteHostDev = true) {
+  const __inDev = window.location.hostname.startsWith('dev.');
+
+  const parsedDeeplink = new URL(deeplink);
+  const sniffedURL = parsedDeeplink.searchParams.get('url');
+  const targetURL = sniffedURL ? new URL(sniffedURL) : parsedDeeplink;
+
+  if (sniffedURL && __inDev && rewriteHostDev) {
+    // Rewrite host pointing to self location
+    targetURL.host = this._location.host;
+  }
+
+  if (!targetURL.protocol.startsWith('http')) {
+    debugPossibleUnhandledURL(deeplink, targetURL);
+  }
+
+  return targetURL;
+}

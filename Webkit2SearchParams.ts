@@ -3,17 +3,21 @@ type ValueTransformer<T> = (value: string) => T;
 
 const identityFn: ValueTransformer<any> = value => value;
 
-const NativeSearchParams = typeof URLSearchParams !== 'undefined'
-  ? URLSearchParams
-  // Fallback to `Map` class when no `URLSearchParams`
-  // is available - like in Node.js
-  : Map;
+const a = new URLSearchParams()
 
 /**
  * Helper class
  */
-export class Webkit2SearchParams extends NativeSearchParams {
+export class Webkit2SearchParams extends URLSearchParams {
   static PARAM_PREFIX = '__webkit2__';
+
+  static paramPrefix(param: string) {
+    return this.PARAM_PREFIX + param;
+  }
+
+  constructor(init?: string | { [K in Param]?: string } | URLSearchParams) {
+    super(init);
+  }
 
   get<T = string>(
     param: Param,

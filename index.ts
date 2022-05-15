@@ -1,6 +1,7 @@
 import { Webkit2SearchParams } from './Webkit2SearchParams'
 import { NavigationState } from './NavigationState'
-import { generateRandomGroupID, debugPossibleUnhandledURL } from './utils'
+import { getTargetURL } from './utils'
+import { NavigationGroup } from './NavigationGroup';
 
 interface PushOptions {
   replace?: boolean;
@@ -21,11 +22,6 @@ export class Navigation {
   private _location = window.location;
 
   /**
-   * Flag for DEV mode
-   */
-  private __inDev = this._location.hostname.startsWith('dev.');
-
-  /**
    * Current navigation state
    */
   private _state: NavigationState = (() => {
@@ -37,38 +33,29 @@ export class Navigation {
     });
   })();
 
+  /**
+   * Active navigation group
+   */
+  private _group = new NavigationGroup(this._state.group);
+
   async reload(): Promise<string> {
     this._location.reload();
     return '';
   }
 
   async push(deeplink: string, options: PushOptions & PushWebOptions = {}): Promise<string> {
-    const parsedDeeplink = new URL(deeplink);
-    const sniffedURL = parsedDeeplink.searchParams.get('url');
-    const targetURL = sniffedURL ? new URL(sniffedURL) : parsedDeeplink;
+    const targetURL = getTargetURL(deeplink, options.__web?.rewriteHostDev);
+    const nextParams = new Webkit2SearchParams(targetURL.searchParams);
+    const nextState = this._state.transitionTo({
+      group: options.screens_group,
+      replace: options.replace,
+    });
 
-    if (sniffedURL) {
-      const nextParams = new Webkit2SearchParams(targetURL.searchParams);
-      const nextState = this._state.transitionTo({
-        group: options.screens_group,
-        replace: options.replace,
-      });
+    nextParams.set('group', nextState.group);
+    nextParams.set('screens', nextState.screens);
 
-      nextParams.set('group', nextState.group);
-      nextParams.set('screens', nextState.screens);
-
-      // Update with new params
-      targetURL.search = nextParams.toString();
-
-      if (this.__inDev && options.__web?.rewriteHostDev !== false) {
-        // Rewrite host pointing to self location
-        targetURL.host = this._location.host;
-      }
-    }
-
-    if (!targetURL.protocol.startsWith('http')) {
-      debugPossibleUnhandledURL(deeplink, targetURL);
-    }
+    // Update with new params
+    targetURL.search = nextParams.toString();
 
     // Try to perform navigation
     this._location[options.replace ? 'replace' : 'assign'](targetURL);
@@ -82,22 +69,12 @@ export class Navigation {
     return '';
   }
 
-  async openForResult(deeplink: string): Promise<any> {
-    // Generate a random `GROUP_ID` to reset opened `screens`
-    const randomGroup = generateRandomGroupID();
-
-    await this.push(deeplink, {
-      screens_group: randomGroup,
-      __web: {
-        rewriteHostDev: false,
-      },
-    });
-
-    return null;
+  openForResult(deeplink: string): Promise<any> {
+    const resultPromise = NavigationGroup.spawn(deeplink);
+    return resultPromise;
   }
 
-  async closeScreenGroup(): Promise<string> {
-    await this.pop({ screens: this._state.screens });
-    return '';
+  async closeScreenGroup(args: { result?: any } = {}): Promise<string> {
+    return this._group.close(args.result);
   }
 }
