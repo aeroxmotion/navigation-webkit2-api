@@ -77,4 +77,13 @@ export class Navigation {
   async closeScreenGroup(args: { result?: any } = {}): Promise<string> {
     return this._group.close(args.result);
   }
+
+  getStoreGroup(selector?: string): Promise<any> {
+    return this._group.getStore(selector);
+  }
+
+  setStoreGroup(nextStoreProducer?: (store: any) => any, selector?: string) {
+    const nextStore = nextStoreProducer(this._group.getStore(selector));
+    return this._group.setStore(nextStore, selector);
+  }
 }

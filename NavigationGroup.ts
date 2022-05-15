@@ -3,6 +3,7 @@ import { Webkit2SearchParams } from './Webkit2SearchParams';
 
 export class NavigationGroup {
   static RESULT_KEY_PREFIX = '__webkit2__result__';
+  static STORAGE_KEY_PREFIX = '__webkit2__storage__';
 
   static resultKey(group: string) {
     return NavigationGroup.RESULT_KEY_PREFIX + group;
@@ -45,7 +46,11 @@ export class NavigationGroup {
     });
   }
 
+  /**
+   * Helpers
+   */
   private _window = window;
+  private _storage: Storage = this._window.sessionStorage;
 
   constructor(
     public group: string) {}
@@ -61,5 +66,19 @@ export class NavigationGroup {
       // Close window after some ticks
       setTimeout(() => this._window.close(), 5);
     });
+  }
+
+  async getStore(selector?: string): Promise<any> {
+    const store = JSON.parse(this._storage.getItem(this._storageKey(selector)) ?? '{}');
+    return store;
+  }
+
+  async setStore(value: any, selector?: string): Promise<string> {
+    this._storage.setItem(this._storageKey(selector), JSON.stringify(value));
+    return '';
+  }
+
+  private _storageKey(selector = 'default') {
+    return `${NavigationGroup.STORAGE_KEY_PREFIX}:${this.group}:${selector}`;
   }
 }
